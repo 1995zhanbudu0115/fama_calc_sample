@@ -8,12 +8,12 @@ merge_all = lambda x,y: pd.merge(x,y,on=['code','date'],how='outer')
 wmean = lambda x,y: np.average(x,weights=y)
 weight_style = 'eq'
 # %%
-ipo_date = pd.read_excel('data\上市首日日期.xlsx')
-ipo_date.columns = ['code','name','ipo_date']
-ipo_date = ipo_date.drop('name',axis=1)
-ipo_date['ipo_date'] = ipo_date['ipo_date'].astype('datetime64[ns]')
-ipo_date['code'] = ipo_date['code'].astype(str).str.zfill(6)
-dprice = pd.read_excel('data\行情数据-only data周度.xlsx')
+# ipo_date = pd.read_excel('data\上市首日日期.xlsx')
+# ipo_date.columns = ['code','name','ipo_date']
+# ipo_date = ipo_date.drop('name',axis=1)
+# ipo_date['ipo_date'] = ipo_date['ipo_date'].astype('datetime64[ns]')
+# ipo_date['code'] = ipo_date['code'].astype(str).str.zfill(6)
+dprice = pd.read_excel('data\行情数据-only data日度.xlsx')
 dprice = dprice[1:]
 dprice = pd.melt(dprice,id_vars='日期',var_name='code',value_name='price')
 dprice = dprice[dprice['price'] != 0 ]
