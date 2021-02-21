@@ -6,14 +6,14 @@ from functools import reduce
 # %%
 merge_all = lambda x,y: pd.merge(x,y,on=['code','date'],how='outer')
 wmean = lambda x,y: np.average(x,weights=y)
-weight_style = 'eq'
+weight_style = 'wq'
 # %%
-# ipo_date = pd.read_excel('data\上市首日日期.xlsx')
-# ipo_date.columns = ['code','name','ipo_date']
-# ipo_date = ipo_date.drop('name',axis=1)
-# ipo_date['ipo_date'] = ipo_date['ipo_date'].astype('datetime64[ns]')
-# ipo_date['code'] = ipo_date['code'].astype(str).str.zfill(6)
-dprice = pd.read_excel('data\行情数据-only data日度.xlsx')
+ipo_date = pd.read_excel('data\上市首日日期.xlsx')
+ipo_date.columns = ['code','name','ipo_date']
+ipo_date = ipo_date.drop('name',axis=1)
+ipo_date['ipo_date'] = ipo_date['ipo_date'].astype('datetime64[ns]')
+ipo_date['code'] = ipo_date['code'].astype(str).str.zfill(6)
+dprice = pd.read_excel('data\行情数据-only data周度.xlsx')
 dprice = dprice[1:]
 dprice = pd.melt(dprice,id_vars='日期',var_name='code',value_name='price')
 dprice = dprice[dprice['price'] != 0 ]
@@ -21,20 +21,20 @@ dprice['code'] = dprice['code'].astype(str).str.zfill(6)
 dprice['dret'] = dprice.groupby('code')['price'].pct_change(1)
 # dprice = dprice[dprice['日期'] > '2018-01-01']
 dprice = dprice.rename({'日期':'date'},axis=1)
-dprice['ym'] = dprice['date'].apply(lambda x:x.year*100 + 6 if x.month > 6 else  (x.year - 1)*100 + 6)
+dprice['ym'] = dprice['date'].apply(lambda x:x.year if x.month > 6 else x.year - 1)
 dprice = dprice.merge(ipo_date,on=['code'])
 dprice['ipo_diff'] = (dprice['date']-dprice['ipo_date']).dt.days
 # 剔除上市小于60天的收盘价
 dprice = dprice[dprice['ipo_diff'] > 60]
 # %%
-rf = pd.read_excel('data\定期存款利率3个月.xls', header=1)
+# rf = pd.read_excel('data\定期存款利率3个月.xls', header=1)
 exf = pd.ExcelFile('data\股票样本因子数据20210219.xlsx')
 ext_fin = pd.read_excel('data\非金融企业股票样本.xlsx')
 # 剔除金融股
-# ext_fin = ext_fin.iloc[:,1:]
-# ext_fin.columns=['code','name']
-# ext_fin['code'] = ext_fin['code'].astype(str).str.zfill(6)
-# dprice = dprice[dprice['code'].isin(ext_fin['code'])]
+ext_fin = ext_fin.iloc[:,1:]
+ext_fin.columns=['code','name']
+ext_fin['code'] = ext_fin['code'].astype(str).str.zfill(6)
+dprice = dprice[dprice['code'].isin(ext_fin['code'])]
 
 # ofactor = pd.read_excel('data\股票样本因子数据20210212.xlsx')
 ofacts_list = []
@@ -46,13 +46,13 @@ for sn in exf.sheet_names:
     ofacts_list.append(ofact)
 ofacts = reduce(merge_all,ofacts_list)
 # ofacts['ym'] = (ofacts['date']-1)*100 + 6
-ofacts['ym'] = ofacts['date']*100 + 6
+ofacts['ym'] = ofacts['date']
 ofacts = ofacts.drop('date',axis=1)
 ofacts['code'] = ofacts['code'].astype(str).str.zfill(6)
 # %%
 # 数据清洗
 ofacts.columns=['code','size','bp','op','inv','esg','ym']
-ofacts = ofacts[ofacts['bp'] != 0]
+ofacts = ofacts[(ofacts['bp'] != 0) | (ofacts['bp'] < 0)] 
 ofacts = ofacts[ofacts['size'] != 0]
 ofacts = ofacts[ofacts['op'] != 0]
 ofacts = ofacts[ofacts['inv'] != 0]
@@ -67,6 +67,13 @@ ofacts['g2'] = ofacts.groupby('ym')[['bp']].transform(pd.qcut,[0,0.3,0.7,1],labe
 ofacts['g3'] = ofacts.groupby('ym')[['op']].transform(pd.qcut,[0,0.3,0.7,1],labels=['W','N','R'])
 ofacts['g4'] = ofacts.groupby('ym')[['inv']].transform(pd.qcut,[0,0.3,0.7,1],labels=['A','N','C'])
 ofacts['g5'] = ofacts.groupby('ym')[['esg']].transform(pd.qcut,[0,0.3,0.7,1],labels=['B','N','G'])
+# 分成25组
+ofacts['ME_group5'] = ofacts.groupby('ym')[['size']].transform(pd.qcut,5,labels=[1,2,3,4,5])
+ofacts['BM_group5'] = ofacts.groupby('ym')[['bp']].transform(pd.qcut,5,labels=[1,2,3,4,5])
+ofacts['OP_group5'] = ofacts.groupby('ym')[['op']].transform(pd.qcut,5,labels=[1,2,3,4,5])
+ofacts['Inv_group5'] = ofacts.groupby('ym')[['inv']].transform(pd.qcut,5,labels=[1,2,3,4,5])
+ofacts['Esg_group5'] = ofacts.groupby('ym')[['esg']].transform(pd.qcut,5,labels=[1,2,3,4,5])
+
 ofacts['SMB_BM'] = ofacts['g1']+ofacts['g2']
 ofacts['SMB_OP'] = ofacts['g1']+ofacts['g3']
 ofacts['SMB_INV'] = ofacts['g1']+ofacts['g4']
@@ -86,7 +93,12 @@ else:
     smb_opdf = ffdf.groupby(['date','SMB_OP']).apply(lambda x:wmean(x['dret'],x['size'])).unstack().sort_index()
     smb_invdf = ffdf.groupby(['date','SMB_INV']).apply(lambda x:wmean(x['dret'],x['size'])).unstack().sort_index()
     smb_esgdf = ffdf.groupby(['date','SMB_ESG']).apply(lambda x:wmean(x['dret'],x['size'])).unstack().sort_index()
-
+    # 分25组收益
+    smb_bm_group5 = ffdf.groupby(['date','ME_group5','BM_group5']).apply(lambda x:wmean(x['dret'],x['size'])).reset_index()
+    smb_op_group5 = ffdf.groupby(['date','ME_group5','OP_group5']).apply(lambda x:wmean(x['dret'],x['size'])).reset_index()
+    smb_inv_group5 = ffdf.groupby(['date','ME_group5','Inv_group5']).apply(lambda x:wmean(x['dret'],x['size'])).reset_index()
+    smb_esg_group5 = ffdf.groupby(['date','ME_group5','Esg_group5']).apply(lambda x:wmean(x['dret'],x['size'])).reset_index()
+    
 smb_bm = smb_bmdf.loc[:,smb_bmdf.columns.str.contains('S')].mean(axis=1) - smb_bmdf.loc[:,smb_bmdf.columns.str.contains('B')].mean(axis=1)
 smb_op = smb_opdf.loc[:,smb_opdf.columns.str.contains('S')].mean(axis=1) - smb_opdf.loc[:,smb_opdf.columns.str.contains('B')].mean(axis=1)
 smb_inv = smb_invdf.loc[:,smb_invdf.columns.str.contains('S')].mean(axis=1) - smb_invdf.loc[:,smb_invdf.columns.str.contains('B')].mean(axis=1)
@@ -101,7 +113,7 @@ ffact['CMA'] = smb_invdf[['SC','BC']].mean(axis=1)-smb_invdf[['SA','BA']].mean(a
 ffact['ESG'] = smb_esgdf[['SG','BG']].mean(axis=1)-smb_esgdf[['SB','BB']].mean(axis=1)
 ffact.to_csv(f'ffact_{weight_style}.csv')
 # %%
-mkt_rf = pd.read_excel('data\市值溢价因子.xlsx')
+mkt_rf = pd.read_excel('data\市值溢价因子 from国泰安.xlsx')
 mkt_rf = mkt_rf[['交易日期','市场风险溢价因子(流通市值加权)']]
 mkt_rf.columns = ['date','MKT_RF']
 ffact = pd.read_csv(f'ffact_{weight_style}.csv')

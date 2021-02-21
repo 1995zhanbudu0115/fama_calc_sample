@@ -1,13 +1,16 @@
-cd "F:\project\stata_project\0215"
+cd "D:\stata_project\fama_calc_sample"
 global style "eq"
-import delimited ffact_$style.csv,clear
-
+global freq "_d"
+import delimited ffact_$style$freq.csv,clear
 
 local ffcts "mkt_rf smb hml rmw cma esg"
-//描述性统计 T检验 表2结果
-foreach v in `ffcts' {
-asdoc ttest `v'==0,dec(8) //小数点保留8位
-}
+pwcorr_a `ffcts',sig
+//
+// local ffcts "mkt_rf smb hml rmw cma esg"
+// //描述性统计 T检验 表2结果
+// foreach v in `ffcts' {
+// asdoc ttest `v'==0,dec(8) //小数点保留8位
+// }
 
 local mkt_test "rmw cma esg"
 //市场风格检验 截距项为表3结果
