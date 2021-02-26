@@ -13,7 +13,7 @@ ipo_date.columns = ['code','name','ipo_date']
 ipo_date = ipo_date.drop('name',axis=1)
 ipo_date['ipo_date'] = ipo_date['ipo_date'].astype('datetime64[ns]')
 ipo_date['code'] = ipo_date['code'].astype(str).str.zfill(6)
-dprice = pd.read_excel('data\行情数据-only data周度.xlsx')
+dprice = pd.read_excel('data\行情数据-only data日度.xlsx')
 dprice = dprice[1:]
 dprice = pd.melt(dprice,id_vars='日期',var_name='code',value_name='price')
 dprice = dprice[dprice['price'] != 0 ]
@@ -94,11 +94,11 @@ else:
     smb_invdf = ffdf.groupby(['date','SMB_INV']).apply(lambda x:wmean(x['dret'],x['size'])).unstack().sort_index()
     smb_esgdf = ffdf.groupby(['date','SMB_ESG']).apply(lambda x:wmean(x['dret'],x['size'])).unstack().sort_index()
     # 分25组收益
-    smb_bm_group5 = ffdf.groupby(['date','ME_group5','BM_group5']).apply(lambda x:wmean(x['dret'],x['size'])).reset_index()
-    smb_op_group5 = ffdf.groupby(['date','ME_group5','OP_group5']).apply(lambda x:wmean(x['dret'],x['size'])).reset_index()
-    smb_inv_group5 = ffdf.groupby(['date','ME_group5','Inv_group5']).apply(lambda x:wmean(x['dret'],x['size'])).reset_index()
-    smb_esg_group5 = ffdf.groupby(['date','ME_group5','Esg_group5']).apply(lambda x:wmean(x['dret'],x['size'])).reset_index()
-    
+    smb_bm_group5 = ffdf.groupby(['date','ME_group5','BM_group5']).apply(lambda x:wmean(x['dret'],x['size'])).reset_index().rename({0:'dret'},axis=1)
+    smb_op_group5 = ffdf.groupby(['date','ME_group5','OP_group5']).apply(lambda x:wmean(x['dret'],x['size'])).reset_index().rename({0:'dret'},axis=1)
+    smb_inv_group5 = ffdf.groupby(['date','ME_group5','Inv_group5']).apply(lambda x:wmean(x['dret'],x['size'])).reset_index().rename({0:'dret'},axis=1)
+    smb_esg_group5 = ffdf.groupby(['date','ME_group5','Esg_group5']).apply(lambda x:wmean(x['dret'],x['size'])).reset_index().rename({0:'dret'},axis=1)
+
 smb_bm = smb_bmdf.loc[:,smb_bmdf.columns.str.contains('S')].mean(axis=1) - smb_bmdf.loc[:,smb_bmdf.columns.str.contains('B')].mean(axis=1)
 smb_op = smb_opdf.loc[:,smb_opdf.columns.str.contains('S')].mean(axis=1) - smb_opdf.loc[:,smb_opdf.columns.str.contains('B')].mean(axis=1)
 smb_inv = smb_invdf.loc[:,smb_invdf.columns.str.contains('S')].mean(axis=1) - smb_invdf.loc[:,smb_invdf.columns.str.contains('B')].mean(axis=1)
@@ -120,4 +120,68 @@ ffact = pd.read_csv(f'ffact_{weight_style}.csv')
 ffact = ffact.merge(mkt_rf,on=['date'])
 ffact.to_csv(f'ffact_{weight_style}.csv', index=False)
 
+# %%
+smb_bm_group5.to_csv('25分组收益size-bm.csv',index=False)
+smb_op_group5.to_csv('25分组收益size-op.csv',index=False)
+smb_inv_group5.to_csv('25分组收益size-inv.csv',index=False)
+smb_esg_group5.to_csv('25分组收益size-esg.csv',index=False)
+
+# %%
+smb_bm_group5 = pd.read_csv('25分组收益size-bm.csv')
+smb_op_group5 = pd.read_csv('25分组收益size-op.csv')
+smb_inv_group5 = pd.read_csv('25分组收益size-inv.csv')
+smb_esg_group5 = pd.read_csv('25分组收益size-esg.csv')
+rf = pd.read_excel('data\定期存款利率3个月.xls')
+rf = rf[1:].dropna()
+rf.columns = ['date','rf']
+rf['ym'] = rf['date'].apply(lambda x:x.year*100+x.month)
+# rf['wrf'] = rf['rf']/100/365*7
+rf['wrf'] = rf['rf']/100/365
+rf = rf.drop(['rf','date'],axis=1)
+smb_bm_group5['ym'] = smb_bm_group5['date'].apply(lambda x:x[:4]+x[5:7]).astype(int)
+smb_bm_group5 = smb_bm_group5.merge(rf,on='ym',how='left')
+smb_bm_group5 = smb_bm_group5.fillna(method='pad').fillna(0)
+smb_bm_group5['dret'] = smb_bm_group5['dret']-smb_bm_group5['wrf']
+
+smb_op_group5['ym'] = smb_op_group5['date'].apply(lambda x:x[:4]+x[5:7]).astype(int)
+smb_op_group5 = smb_op_group5.merge(rf,on='ym',how='left')
+smb_op_group5 = smb_op_group5.fillna(method='pad').fillna(0)
+smb_op_group5['dret'] = smb_op_group5['dret']-smb_op_group5['wrf']
+
+smb_inv_group5['ym'] = smb_inv_group5['date'].apply(lambda x:x[:4]+x[5:7]).astype(int)
+smb_inv_group5 = smb_inv_group5.merge(rf,on='ym',how='left')
+smb_inv_group5 = smb_inv_group5.fillna(method='pad').fillna(0)
+smb_inv_group5['dret'] = smb_inv_group5['dret']-smb_inv_group5['wrf']
+
+smb_esg_group5['ym'] = smb_esg_group5['date'].apply(lambda x:x[:4]+x[5:7]).astype(int)
+smb_esg_group5 = smb_esg_group5.merge(rf,on='ym',how='left')
+smb_esg_group5 = smb_esg_group5.fillna(method='pad').fillna(0)
+smb_esg_group5['dret'] = smb_esg_group5['dret']-smb_esg_group5['wrf']
+
+smb_bm_group5.to_csv('25分组收益size-bm.csv',index=False)
+smb_op_group5.to_csv('25分组收益size-op.csv',index=False)
+smb_inv_group5.to_csv('25分组收益size-inv.csv',index=False)
+smb_esg_group5.to_csv('25分组收益size-esg.csv',index=False)
+# %%
+
+# 25 分组回归结果整理
+
+offcts = ['hml','rmw','cma','esg']
+ddct = {'hml':'bm_group5','rmw':'op_group5','cma':'inv_group5','esg':'esg_group5'}
+for of in offcts:
+    nffcts = ['smb','hml','rmw','cma','esg']
+    nffcts.remove(of)
+    nffcts.insert(0,f'{of}o')
+    resu = pd.read_excel(f'25分组回归结果{of}o.xlsx')
+    resu = pd.pivot_table(resu,index='me_group5',columns=ddct[of])  
+    ct_df_list = []
+    resue = pd.ExcelWriter(f'25分组整理后结果{of}o.xlsx')
+    for c in nffcts:
+        ct_df = resu[[f'_b_{c}',f'p_{c}',f't_{c}']]
+        ct_df.to_excel(resue,c)
+    cons = resu[['_b_cons','p_cons','t_cons']]
+    cons.to_excel(resue,'cons')
+    r2 = resu[['_adjR2','_rmse']]
+    r2.to_excel(resue,'r2')
+    resue.close()
 # %%
